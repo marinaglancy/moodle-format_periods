@@ -1,0 +1,516 @@
+<?php
+
+/**
+ * This file contains main class for the course format Periods
+ *
+ * @package   format_periods
+ * @copyright 2014 Marina Glancy
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+defined('MOODLE_INTERNAL') || die();
+require_once($CFG->dirroot. '/course/format/lib.php');
+
+define('FORMAT_PERIODS_FUTURE_AVAILABLE_ALWAYS', 0);
+define('FORMAT_PERIODS_FUTURE_COLLAPSED', 1);
+define('FORMAT_PERIODS_FUTURE_NOT_AVAILABLE', 5);
+define('FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO', 6);
+
+define('FORMAT_PERIODS_PAST_DISPLAYED_ALWAYS', 0);
+define('FORMAT_PERIODS_PAST_COLLAPSED', 1);
+define('FORMAT_PERIODS_PAST_NOT_DISPLAYED', 2);
+
+define('FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE', 0);
+
+/**
+ * Main class for the Periods course format
+ *
+ * @package    format_periods
+ * @copyright 2014 Marina Glancy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class format_periods extends format_base {
+
+    /**
+     * Returns true if this course format uses sections
+     *
+     * @return bool
+     */
+    public function uses_sections() {
+        return true;
+    }
+
+    /**
+     * Returns the display name of the given section that the course prefers.
+     *
+     * @param int|stdClass $section Section object from database or just field section.section
+     * @return string Display name that the course format prefers, e.g. "Topic 2"
+     */
+    public function get_section_name($section) {
+        $section = $this->get_section($section);
+        if ((string)$section->name !== '') {
+            // Return the name the user set.
+            return format_string($section->name, true, array('context' => context_course::instance($this->courseid)));
+        } else if ($section->section == 0) {
+            // Return the general section.
+            return get_string('section0name', 'format_periods');
+        } else {
+            $dates = $this->get_section_dates($section);
+
+            // We subtract 24 hours for display purposes.
+            $dates->end = ($dates->end - 86400);
+
+            $dateformat = get_string('strftimedateshort');
+            $weekday = userdate($dates->start, $dateformat);
+            $endweekday = userdate($dates->end, $dateformat);
+            if ($weekday === $endweekday) {
+                return $weekday;
+            } else {
+                return $weekday.' - '.$endweekday;
+            }
+        }
+    }
+
+    /**
+     * The URL to use for the specified course (with section)
+     *
+     * @param int|stdClass $section Section object from database or just field course_sections.section
+     *     if omitted the course view page is returned
+     * @param array $options options for view URL. At the moment core uses:
+     *     'navigation' (bool) if true and section has no separate page, the function returns null
+     *     'sr' (int) used by multipage formats to specify to which section to return
+     * @return null|moodle_url
+     */
+    public function get_view_url($section, $options = array()) {
+        $course = $this->get_course();
+        $url = new moodle_url('/course/view.php', array('id' => $course->id));
+
+        $sr = null;
+        if (array_key_exists('sr', $options)) {
+            $sr = $options['sr'];
+        }
+        if (is_object($section)) {
+            $sectionno = $section->section;
+        } else {
+            $sectionno = $section;
+        }
+        if ($sectionno !== null) {
+            if ($sr !== null) {
+                if ($sr) {
+                    $usercoursedisplay = COURSE_DISPLAY_MULTIPAGE;
+                    $sectionno = $sr;
+                } else {
+                    $usercoursedisplay = COURSE_DISPLAY_SINGLEPAGE;
+                }
+            } else {
+                $usercoursedisplay = $course->coursedisplay;
+            }
+            if ($sectionno != 0 && $usercoursedisplay == COURSE_DISPLAY_MULTIPAGE) {
+                $url->param('section', $sectionno);
+            } else {
+                if (!empty($options['navigation'])) {
+                    return null;
+                }
+                $url->set_anchor('section-'.$sectionno);
+            }
+        }
+        return $url;
+    }
+
+    /**
+     * Returns the information about the ajax support in the given source format
+     *
+     * The returned object's property (boolean)capable indicates that
+     * the course format supports Moodle course ajax features.
+     *
+     * @return stdClass
+     */
+    public function supports_ajax() {
+        $ajaxsupport = new stdClass();
+        $ajaxsupport->capable = true;
+        return $ajaxsupport;
+    }
+
+    /**
+     * Loads all of the course sections into the navigation
+     *
+     * @param global_navigation $navigation
+     * @param navigation_node $node The course node within the navigation
+     */
+    public function extend_course_navigation($navigation, navigation_node $node) {
+        global $PAGE;
+        // if section is specified in course/view.php, make sure it is expanded in navigation
+        if ($navigation->includesectionnum === false) {
+            $selectedsection = optional_param('section', null, PARAM_INT);
+            if ($selectedsection !== null && (!defined('AJAX_SCRIPT') || AJAX_SCRIPT == '0') &&
+                    $PAGE->url->compare(new moodle_url('/course/view.php'), URL_MATCH_BASE)) {
+                $navigation->includesectionnum = $selectedsection;
+            }
+        }
+        parent::extend_course_navigation($navigation, $node);
+    }
+
+    /**
+     * Custom action after section has been moved in AJAX mode
+     *
+     * Used in course/rest.php
+     *
+     * @return array This will be passed in ajax respose
+     */
+    function ajax_section_move() {
+        global $PAGE;
+        $titles = array();
+        $current = -1;
+        $course = $this->get_course();
+        $modinfo = get_fast_modinfo($course);
+        $renderer = $this->get_renderer($PAGE);
+        if ($renderer && ($sections = $modinfo->get_section_info_all())) {
+            foreach ($sections as $number => $section) {
+                $titles[$number] = $renderer->section_title($section, $course);
+                if ($this->is_section_current($section)) {
+                    $current = $number;
+                }
+            }
+        }
+        return array('sectiontitles' => $titles, 'current' => $current, 'action' => 'move');
+    }
+
+    /**
+     * Returns the list of blocks to be automatically added for the newly created course
+     *
+     * @return array of default blocks, must contain two keys BLOCK_POS_LEFT and BLOCK_POS_RIGHT
+     *     each of values is an array of block names (for left and right side columns)
+     */
+    public function get_default_blocks() {
+        return array(
+            BLOCK_POS_LEFT => array(),
+            BLOCK_POS_RIGHT => array('search_forums', 'news_items', 'calendar_upcoming', 'recent_activity')
+        );
+    }
+
+    /**
+     * Definitions of the additional options that this course format uses for course
+     *
+     * Periods format uses the following options:
+     * - coursedisplay
+     * - numsections
+     * - hiddensections
+     *
+     * @param bool $foreditform
+     * @return array of options
+     */
+    public function course_format_options($foreditform = false) {
+        static $courseformatoptions = false;
+        if ($courseformatoptions === false) {
+            $courseconfig = get_config('moodlecourse');
+            $courseformatoptions = array(
+                'numsections' => array(
+                    'default' => $courseconfig->numsections,
+                    'type' => PARAM_INT,
+                ),
+                'hiddensections' => array(
+                    'default' => $courseconfig->hiddensections,
+                    'type' => PARAM_INT,
+                ),
+                'coursedisplay' => array(
+                    'default' => $courseconfig->coursedisplay,
+                    'type' => PARAM_INT,
+                ),
+                'periodduration' => array(
+                    'default' => 604800,
+                    'type' => PARAM_INT
+                ),
+                'showfutureperiods' => array(
+                    'default' => 0,
+                    'type' => PARAM_INT
+                ),
+                'showpastperiods' => array(
+                    'default' => 0,
+                    'type' => PARAM_INT
+                ),
+                'showpastcompleted' => array(
+                    'default' => 0,
+                    'type' => PARAM_INT
+                )
+            );
+        }
+        if ($foreditform && !isset($courseformatoptions['coursedisplay']['label'])) {
+            $courseconfig = get_config('moodlecourse');
+            $sectionmenu = array();
+            $max = $courseconfig->maxsections;
+            if (!isset($max) || !is_numeric($max)) {
+                $max = 52;
+            }
+            for ($i = 0; $i <= $max; $i++) {
+                $sectionmenu[$i] = "$i";
+            }
+            $courseformatoptionsedit = array(
+                'numsections' => array(
+                    'label' => new lang_string('numberperiods', 'format_periods'),
+                    'element_type' => 'select',
+                    'element_attributes' => array($sectionmenu),
+                ),
+                'hiddensections' => array(
+                    'label' => new lang_string('hiddensections'),
+                    'help' => 'hiddensections',
+                    'help_component' => 'moodle',
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            0 => new lang_string('hiddensectionscollapsed'),
+                            1 => new lang_string('hiddensectionsinvisible')
+                        )
+                    ),
+                ),
+                'coursedisplay' => array(
+                    'label' => new lang_string('coursedisplay'),
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            COURSE_DISPLAY_SINGLEPAGE => new lang_string('coursedisplay_single'),
+                            COURSE_DISPLAY_MULTIPAGE => new lang_string('coursedisplay_multi')
+                        )
+                    ),
+                    'help' => 'coursedisplay',
+                    'help_component' => 'moodle',
+                ),
+                'periodduration' => array(
+                    'label' => 'Period duration',// TODO: new lang_string('periodduration'),
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            604800 => 'One week', // TODO string
+                            86400 => 'One day', // TODO string
+                        )
+                    ),
+                ),
+                'showfutureperiods' => array(
+                    'label' => 'Future periods',// TODO: new lang_string('periodduration'),
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            FORMAT_PERIODS_FUTURE_AVAILABLE_ALWAYS => 'Display expanded', // TODO string
+                            //FORMAT_PERIODS_FUTURE_COLLAPSED => 'Display collapsed', // TODO string
+                            FORMAT_PERIODS_FUTURE_NOT_AVAILABLE => 'Hide completely', // TODO string
+                            FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO => 'Hide content', // TODO string
+                        )
+                    ),
+                ),
+                'showpastperiods' => array(
+                    'label' => 'Past periods',// TODO: new lang_string('periodduration'),
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            FORMAT_PERIODS_PAST_DISPLAYED_ALWAYS => 'Display expanded', // TODO string
+                            //FORMAT_PERIODS_PAST_COLLAPSED => 'Display collapsed', // TODO string
+                            FORMAT_PERIODS_PAST_NOT_DISPLAYED => 'Hide from the course view', // TODO string
+                        )
+                    ),
+                ),
+                'showpastcompleted' => array(
+                    'label' => 'Past completed periods',// TODO: new lang_string('periodduration'),
+                    'element_type' => 'select',
+                    'element_attributes' => array(
+                        array(
+                            FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE => 'As above', // TODO string
+                            //FORMAT_PERIODS_PAST_COLLAPSED => 'Display collapsed', // TODO string
+                            FORMAT_PERIODS_PAST_NOT_DISPLAYED => 'Hide from the course view', // TODO string
+                        )
+                    ),
+                )
+            );
+            $courseformatoptions = array_merge_recursive($courseformatoptions, $courseformatoptionsedit);
+        }
+        return $courseformatoptions;
+    }
+
+    /**
+     * Adds format options elements to the course/section edit form.
+     *
+     * This function is called from {@link course_edit_form::definition_after_data()}.
+     *
+     * @param MoodleQuickForm $mform form the elements are added to.
+     * @param bool $forsection 'true' if this is a section edit form, 'false' if this is course edit form.
+     * @return array array of references to the added form elements.
+     */
+    public function create_edit_form_elements(&$mform, $forsection = false) {
+        $elements = parent::create_edit_form_elements($mform, $forsection);
+
+        // Increase the number of sections combo box values if the user has increased the number of sections
+        // using the icon on the course page beyond course 'maxsections' or course 'maxsections' has been
+        // reduced below the number of sections already set for the course on the site administration course
+        // defaults page.  This is so that the number of sections is not reduced leaving unintended orphaned
+        // activities / resources.
+        if (!$forsection) {
+            $maxsections = get_config('moodlecourse', 'maxsections');
+            $numsections = $mform->getElementValue('numsections');
+            $numsections = $numsections[0];
+            if ($numsections > $maxsections) {
+                $element = $mform->getElement('numsections');
+                for ($i = $maxsections+1; $i <= $numsections; $i++) {
+                    $element->addOption("$i", $i);
+                }
+            }
+        }
+        return $elements;
+    }
+
+    /**
+     * Updates format options for a course
+     *
+     * In case if course format was changed to 'periods', we try to copy options
+     * 'coursedisplay', 'numsections' and 'hiddensections' from the previous format.
+     * If previous course format did not have 'numsections' option, we populate it with the
+     * current number of sections
+     *
+     * @param stdClass|array $data return value from {@link moodleform::get_data()} or array with data
+     * @param stdClass $oldcourse if this function is called from {@link update_course()}
+     *     this object contains information about the course before update
+     * @return bool whether there were any changes to the options values
+     */
+    public function update_course_format_options($data, $oldcourse = null) {
+        global $DB;
+        if ($oldcourse !== null) {
+            $data = (array)$data;
+            $oldcourse = (array)$oldcourse;
+            $options = $this->course_format_options();
+            foreach ($options as $key => $unused) {
+                if (!array_key_exists($key, $data)) {
+                    if (array_key_exists($key, $oldcourse)) {
+                        $data[$key] = $oldcourse[$key];
+                    } else if ($key === 'numsections') {
+                        // If previous format does not have the field 'numsections'
+                        // and $data['numsections'] is not set,
+                        // we fill it with the maximum section number from the DB
+                        $maxsection = $DB->get_field_sql('SELECT max(section) from {course_sections}
+                            WHERE course = ?', array($this->courseid));
+                        if ($maxsection) {
+                            // If there are no sections, or just default 0-section, 'numsections' will be set to default
+                            $data['numsections'] = $maxsection;
+                        }
+                    }
+                }
+            }
+        }
+        return $this->update_format_options($data);
+    }
+
+    /**
+     * Return the start and end date of the passed section
+     *
+     * @param int|stdClass|section_info $section section to get the dates for
+     * @return stdClass property start for startdate, property end for enddate
+     */
+    public function get_section_dates($section) {
+        $course = $this->get_course();
+        if (is_object($section)) {
+            $sectionnum = $section->section;
+        } else {
+            $sectionnum = $section;
+        }
+        $oneperiodseconds = $course->periodduration;
+        // Hack alert. We add 2 hours to avoid possible DST problems. (e.g. we go into daylight
+        // savings and the date changes.
+        $startdate = $course->startdate + 7200;
+
+        $dates = new stdClass();
+        $dates->start = $startdate + ($oneperiodseconds * ($sectionnum - 1));
+        $dates->end = $dates->start + $oneperiodseconds;
+
+        return $dates;
+    }
+
+    /**
+     * Returns true if the specified week is current
+     *
+     * @param int|stdClass|section_info $section
+     * @return bool
+     */
+    public function is_section_current($section) {
+        if (is_object($section)) {
+            $sectionnum = $section->section;
+        } else {
+            $sectionnum = $section;
+        }
+        if ($sectionnum < 1) {
+            return false;
+        }
+        $timenow = time();
+        $dates = $this->get_section_dates($section);
+        return (($timenow >= $dates->start) && ($timenow < $dates->end));
+    }
+
+    /**
+     * Allows to specify for modinfo that section is not available even when it is visible and conditionally available.
+     *
+     * Note: affected user can be retrieved as: $section->modinfo->userid
+     *
+     * Course format plugins can override the method to change the properties $available and $availableinfo that were
+     * calculated by conditional availability.
+     * To make section unavailable set:
+     *     $available = false;
+     * To make unavailable section completely hidden set:
+     *     $availableinfo = '';
+     * To make unavailable section visible with availability message set:
+     *     $availableinfo = get_string('sectionhidden', 'format_xxx');
+     *
+     * @param section_info $section
+     * @param bool $available the 'available' propery of the section_info as it was evaluated by conditional availability.
+     *     Can be changed by the method but 'false' can not be overridden by 'true'.
+     * @param string $availableinfo the 'availableinfo' propery of the section_info as it was evaluated by conditional availability.
+     *     Can be changed by the method
+     */
+    public function section_get_available_hook(section_info $section, &$available, &$availableinfo) {
+        if (!$available || !$section->section) {
+            return;
+        }
+        $dates = $this->get_section_dates($section);
+        $timenow = time();
+        $course = $this->get_course();
+        if ($dates->start > $timenow) {
+            // Future section.
+            if ($course->showfutureperiods == FORMAT_PERIODS_FUTURE_NOT_AVAILABLE) {
+                $available = false;
+                $availableinfo = '';
+            } else if ($course->showfutureperiods == FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO) {
+                $available = false;
+                $availableinfo = 'Not available yet'; // TODO string
+            }
+        }
+        if ($dates->end < $timenow) {
+            $displaytype = $course->showpastperiods;
+            if ($course->showpastcompleted != FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE) {
+                if ($this->is_section_completed($section)) {
+                    $displaytype = $course->showpastcompleted;
+                }
+            }
+            if ($displaytype == FORMAT_PERIODS_PAST_NOT_DISPLAYED) {
+                $available = false;
+                $availableinfo = '';
+            }
+        }
+    }
+
+    protected $completioninfo = null;
+    public function is_section_completed(section_info $section) {
+        if ($this->completioninfo === null) {
+            $this->completioninfo = new completion_info($this->get_course());
+        }
+        $modinfo = $section->modinfo;
+        if (!empty($modinfo->sections[$section->section])) {
+            foreach ($modinfo->sections[$section->section] as $cmid) {
+                $cm = $modinfo->cms[$cmid];
+
+                $completion = $this->completioninfo->is_enabled($cm);
+                if ($completion == COMPLETION_TRACKING_NONE) {
+                    return false;
+                }
+                $completiondata = $this->completioninfo->get_data($cm, true);
+                if ($completiondata->completionstate != COMPLETION_COMPLETE && $completiondata->completionstate != COMPLETION_COMPLETE_PASS) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+}
