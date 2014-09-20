@@ -224,6 +224,10 @@ class format_periods extends format_base {
                     'default' => 0,
                     'type' => PARAM_INT
                 ),
+                'futuresneakpeek' => array(
+                    'default' => 0,
+                    'type' => PARAM_INT
+                ),
                 'showpastperiods' => array(
                     'default' => 0,
                     'type' => PARAM_INT
@@ -276,7 +280,7 @@ class format_periods extends format_base {
                 ),
                 'periodduration' => array(
                     'label' => 'Period duration',// TODO: new lang_string('periodduration'),
-                    'element_type' => 'select',
+                    'element_type' => 'select', // TODO extend 'duration' and add elements there.
                     'element_attributes' => array(
                         array(
                             604800 => 'One week', // TODO string
@@ -295,6 +299,13 @@ class format_periods extends format_base {
                             FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO => 'Hide content', // TODO string
                         )
                     ),
+                ),
+                'futuresneakpeek' => array(
+                    'label' => 'Future sneak peek',// TODO: new lang_string('periodduration'),
+                    'element_type' => 'duration',
+                    'element_attributes' => array(
+                        array('defaultunit' => 86400, 'optional' => false)
+                    )
                 ),
                 'showpastperiods' => array(
                     'label' => 'Past periods',// TODO: new lang_string('periodduration'),
@@ -467,7 +478,7 @@ class format_periods extends format_base {
         $dates = $this->get_section_dates($section);
         $timenow = time();
         $course = $this->get_course();
-        if ($dates->start > $timenow) {
+        if ($dates->start > $timenow + $course->futuresneakpeek) {
             // Future section.
             if ($course->showfutureperiods == FORMAT_PERIODS_FUTURE_NOT_AVAILABLE) {
                 $available = false;
