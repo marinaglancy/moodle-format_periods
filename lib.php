@@ -503,7 +503,23 @@ class format_periods extends format_base {
     }
 
     protected $completioninfo = null;
+
+    /**
+     * Evaluates if the section is completed.
+     *
+     * If the section was not completed at the start of the session but became
+     * completed, this function will still return false.
+     *
+     * @param section_info $section
+     * @return bool
+     */
     public function is_section_completed(section_info $section) {
+        global $SESSION;
+        if (!empty($SESSION->format_periods[$this->courseid][$section->section])) {
+            // This section was not completed at the beginning of the session,
+            // consider it to be still not completed.
+            return false;
+        }
         if ($this->completioninfo === null) {
             $this->completioninfo = new completion_info($this->get_course());
         }
@@ -513,13 +529,24 @@ class format_periods extends format_base {
                 $cm = $modinfo->cms[$cmid];
 
                 $completion = $this->completioninfo->is_enabled($cm);
-                if ($completion == COMPLETION_TRACKING_NONE) {
-                    return false;
+                if ($completion != COMPLETION_TRACKING_NONE) {
+                    $completiondata = $this->completioninfo->get_data($cm, true);
+                    if ($completiondata->completionstate == COMPLETION_COMPLETE ||
+                            $completiondata->completionstate == COMPLETION_COMPLETE_PASS) {
+                        // Section completed.
+                        continue;
+                    }
                 }
-                $completiondata = $this->completioninfo->get_data($cm, true);
-                if ($completiondata->completionstate != COMPLETION_COMPLETE && $completiondata->completionstate != COMPLETION_COMPLETE_PASS) {
-                    return false;
+                // This section is not completed. Remember this in the session so we
+                // don't hide this section even if user completes everything.
+                if (empty($SESSION->format_periods)) {
+                    $SESSION->format_periods = array();
                 }
+                if (empty($SESSION->format_periods[$this->courseid])) {
+                    $SESSION->format_periods[$this->courseid] = array();
+                }
+                $SESSION->format_periods[$this->courseid][$section->section] = 1;
+                return false;
             }
         }
         return true;
