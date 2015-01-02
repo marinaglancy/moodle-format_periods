@@ -234,13 +234,14 @@ class format_periods extends format_base {
      * @return array of options
      */
     public function course_format_options($foreditform = false) {
+        global $CFG;
         static $courseformatoptions = false;
         if ($courseformatoptions === false) {
             $courseconfig = get_config('moodlecourse');
             $courseformatoptions = array(
                 'periodduration' => array(
-                    'default' => 604800,
-                    'type' => PARAM_INT
+                    'default' => '1 week', // TODO this does not work.
+                    'type' => PARAM_NOTAGS
                 ),
                 'numsections' => array(
                     'default' => $courseconfig->numsections,
@@ -273,6 +274,9 @@ class format_periods extends format_base {
             );
         }
         if ($foreditform && !isset($courseformatoptions['coursedisplay']['label'])) {
+
+            require_once("$CFG->dirroot/course/format/periods/periodduration.php");
+
             $courseconfig = get_config('moodlecourse');
             $sectionmenu = array();
             $max = $courseconfig->maxsections;
@@ -287,13 +291,7 @@ class format_periods extends format_base {
                     'label' => new lang_string('periodduration', 'format_periods'),
                     'help' => 'periodduration',
                     'help_component' => 'format_periods',
-                    'element_type' => 'select', // TODO extend 'duration' and add elements there.
-                    'element_attributes' => array(
-                        array(
-                            604800 => 'One week', // TODO string
-                            86400 => 'One day', // TODO string
-                        )
-                    ),
+                    'element_type' => 'periodduration',
                 ),
                 'numsections' => array(
                     'label' => new lang_string('numberperiods', 'format_periods'),
@@ -465,16 +463,23 @@ class format_periods extends format_base {
         } else {
             $sectionnum = $section;
         }
-        $oneperiodseconds = $course->periodduration;
+
         // Hack alert. We add 2 hours to avoid possible DST problems. (e.g. we go into daylight
         // savings and the date changes.
         $startdate = $course->startdate + 7200;
 
         $dates = new stdClass();
-        // TODO: strtotime('1 day', $startdate);
-        $dates->start = $startdate + ($oneperiodseconds * ($sectionnum - 1));
-        $dates->end = $dates->start + $oneperiodseconds;
-
+        if (is_int($course->periodduration)) {
+            $oneperiodseconds = $course->periodduration;
+            $dates->start = $startdate + ($oneperiodseconds * ($sectionnum - 1));
+            $dates->end = $dates->start + $oneperiodseconds;
+        } else {
+            $dates->start = $startdate;
+            for ($i = 0; $i < $sectionnum - 1; $i++) {
+                $dates->start = strtotime($course->periodduration, $dates->start);
+            }
+            $dates->end = strtotime($course->periodduration, $dates->start);
+        }
         return $dates;
     }
 
