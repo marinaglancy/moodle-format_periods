@@ -70,7 +70,7 @@ class format_periods extends format_base {
             $dates = $this->get_section_dates($section);
 
             // We subtract 24 hours for display purposes.
-            $dates->end = ($dates->end - 86400);
+            $dates->end = strtotime('-1 day', $dates->end);
 
             $dateformat = get_string('strftimedateshort');
             $weekday = userdate($dates->start, $dateformat);
@@ -288,10 +288,11 @@ class format_periods extends format_base {
             }
             $courseformatoptionsedit = array(
                 'periodduration' => array(
-                    'label' => new lang_string('periodduration', 'format_periods'),
-                    'help' => 'periodduration',
+                    'label' => new lang_string('perioddurationdefault', 'format_periods'),
+                    'help' => 'perioddurationdefault',
                     'help_component' => 'format_periods',
                     'element_type' => 'periodduration',
+                    'element_attributes' => array(array('default' => '1 week')),
                 ),
                 'numsections' => array(
                     'label' => new lang_string('numberperiods', 'format_periods'),
@@ -373,6 +374,62 @@ class format_periods extends format_base {
                         )
                     ),
                 )
+            );
+            $courseformatoptions = array_merge_recursive($courseformatoptions, $courseformatoptionsedit);
+        }
+        return $courseformatoptions;
+    }
+
+    /**
+     * Definitions of the additional options that this course format uses for section
+     *
+     * See {@link format_base::course_format_options()} for return array definition.
+     *
+     * Additionally section format options may have property 'cache' set to true
+     * if this option needs to be cached in {@link get_fast_modinfo()}. The 'cache' property
+     * is recommended to be set only for fields used in {@link format_base::get_section_name()},
+     * {@link format_base::extend_course_navigation()} and {@link format_base::get_view_url()}
+     *
+     * For better performance cached options are recommended to have 'cachedefault' property
+     * Unlike 'default', 'cachedefault' should be static and not access get_config().
+     *
+     * Regardless of value of 'cache' all options are accessed in the code as
+     * $sectioninfo->OPTIONNAME
+     * where $sectioninfo is instance of section_info, returned by
+     * get_fast_modinfo($course)->get_section_info($sectionnum)
+     * or get_fast_modinfo($course)->get_section_info_all()
+     *
+     * All format options for particular section are returned by calling:
+     * $this->get_format_options($section);
+     *
+     * @param bool $foreditform
+     * @return array
+     */
+    public function section_format_options($foreditform = false) {
+        global $CFG;
+        static $courseformatoptions = false;
+
+        if ($courseformatoptions === false) {
+            $courseformatoptions = array(
+                'periodduration' => array(
+                    'type' => PARAM_NOTAGS
+                ),
+            );
+        }
+        if ($foreditform && !isset($courseformatoptions['periodduration']['label'])) {
+
+            require_once("$CFG->dirroot/course/format/periods/periodduration.php");
+
+            $courseformatoptionsedit = array(
+                'periodduration' => array(
+                    'label' => new lang_string('perioddurationoverride', 'format_periods'),
+                    'help' => 'perioddurationoverride',
+                    'help_component' => 'format_periods',
+                    'element_type' => 'periodduration',
+                    'element_attributes' => array(
+                        array('optional' => true, 'default' => null)
+                    )
+                ),
             );
             $courseformatoptions = array_merge_recursive($courseformatoptions, $courseformatoptionsedit);
         }
@@ -464,21 +521,28 @@ class format_periods extends format_base {
             $sectionnum = $section;
         }
 
-        // Hack alert. We add 2 hours to avoid possible DST problems. (e.g. we go into daylight
-        // savings and the date changes.
-        $startdate = $course->startdate + 7200;
-
         $dates = new stdClass();
-        if (is_int($course->periodduration)) {
-            $oneperiodseconds = $course->periodduration;
-            $dates->start = $startdate + ($oneperiodseconds * ($sectionnum - 1));
-            $dates->end = $dates->start + $oneperiodseconds;
-        } else {
-            $dates->start = $startdate;
-            for ($i = 0; $i < $sectionnum - 1; $i++) {
-                $dates->start = strtotime($course->periodduration, $dates->start);
+        $dates->end = $dates->start = $course->startdate;
+
+        $sections = $this->get_sections();
+        foreach ($sections as $snum => $sectioninfo) {
+            if (!$snum) {
+
+            } else if ($snum <= $sectionnum) {
+                $duration = $sectioninfo->periodduration ? $sectioninfo->periodduration : $course->periodduration;
+                if (is_int($duration)) {
+                    $dt = $dates->start + $duration;
+                } else {
+                    $dt = strtotime($duration, $dates->start);
+                }
+                if ($snum == $sectionnum) {
+                    $dates->end = $dt;
+                } else {
+                    $dates->start = $dt;
+                }
+            } else {
+                break;
             }
-            $dates->end = strtotime($course->periodduration, $dates->start);
         }
         return $dates;
     }

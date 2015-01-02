@@ -50,7 +50,7 @@ class format_period_periodduration extends MoodleQuickForm_group {
     * optional => if true, show a checkbox beside the element to turn it on (or off)
     * @var array
     */
-   protected $_options = array('optional' => false, 'defaultunit' => 'week', 'defaulttime' => 1);
+   protected $_options = array('optional' => false, 'default' => '1 week', 'defaultunit' => 'week');
 
    /** @var array associative array of time units (days, hours, minutes, seconds) */
    private $_units = null;
@@ -85,12 +85,8 @@ class format_period_periodduration extends MoodleQuickForm_group {
             }
             $this->_options['defaultunit'] = $options['defaultunit'];
         }
-        if (isset($options['defaulttime'])) {
-            if (!is_int($options['defaulttime'])) {
-                throw new coding_exception($options['defaulttime'] .
-                        ' is not a recognised integer in format_period_periodduration.');
-            }
-            $this->_options['defaulttime'] = $options['defaulttime'];
+        if (array_key_exists('default', $options)) {
+            $this->_options['default'] = $options['default'];
         }
     }
 
@@ -130,7 +126,11 @@ class format_period_periodduration extends MoodleQuickForm_group {
                 return array((int)($value/DAYSECS), 'day');
             }
         }
-        return array($this->_options['defaulttime'], $this->_options['defaultunit']);
+        if (preg_match('/^(\d+) (\w+)$/', $this->_options['default'], $matches) &&
+                array_key_exists($matches[2], $this->get_units())) {
+            return array((int)$matches[1], $matches[2]);
+        }
+        return array(0, $this->_options['defaultunit']);
     }
 
     /**
