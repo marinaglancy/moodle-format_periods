@@ -11,6 +11,7 @@
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot. '/course/format/lib.php');
 
+/*
 define('FORMAT_PERIODS_FUTURE_AVAILABLE_ALWAYS', 0);
 define('FORMAT_PERIODS_FUTURE_COLLAPSED', 1);
 define('FORMAT_PERIODS_FUTURE_NOT_AVAILABLE', 5);
@@ -21,6 +22,17 @@ define('FORMAT_PERIODS_PAST_COLLAPSED', 1);
 define('FORMAT_PERIODS_PAST_NOT_DISPLAYED', 2);
 
 define('FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE', 0);
+*/
+
+define('FORMAT_PERIODS_AS_ABOVE', 0);
+
+define('FORMAT_PERIODS_EXPANDED', 0);
+define('FORMAT_PERIODS_COLLAPSED', 1);
+define('FORMAT_PERIODS_NOTDISPLAYED', 2);
+define('FORMAT_PERIODS_HIDDEN', 5);
+define('FORMAT_PERIODS_NOTAVAILABLE', 6);
+
+/* UPGRADE SCRIPT: future not available 5->2 */
 
 /**
  * Main class for the Periods course format
@@ -97,15 +109,15 @@ class format_periods extends format_base {
         if ($sectionno !== null) {
             if ($sr !== null) {
                 if ($sr) {
-                    $usercoursedisplay = COURSE_DISPLAY_MULTIPAGE;
+                    $displaymode = COURSE_DISPLAY_MULTIPAGE;
                     $sectionno = $sr;
                 } else {
-                    $usercoursedisplay = COURSE_DISPLAY_SINGLEPAGE;
+                    $displaymode = COURSE_DISPLAY_SINGLEPAGE;
                 }
             } else {
-                $usercoursedisplay = $course->coursedisplay;
+                $displaymode = $this->get_section_display_mode($section);
             }
-            if ($sectionno != 0 && $usercoursedisplay == COURSE_DISPLAY_MULTIPAGE) {
+            if ($sectionno != 0 && $displaymode == COURSE_DISPLAY_MULTIPAGE) {
                 $url->param('section', $sectionno);
             } else {
                 if (!empty($options['navigation'])) {
@@ -148,6 +160,28 @@ class format_periods extends format_base {
             }
         }
         parent::extend_course_navigation($navigation, $node);
+
+        $modinfo = get_fast_modinfo($this->get_course());
+        $context = context_course::instance($modinfo->courseid);
+        $sectioninfos = $this->get_sections();
+
+        foreach ($sectioninfos as $sectionnum => $section) {
+            if ($sectionnum == 0) {
+                if (empty($modinfo->sections[0]) && ($sectionnode = $node->get($section->id, navigation_node::TYPE_SECTION))) {
+                    // The general section is empty, remove the node from navigation.
+                    $sectionnode->remove();
+                }
+            } else if (($this->get_section_display_mode($section) > FORMAT_PERIODS_COLLAPSED) &&
+                    ($sectionnode = $node->get($section->id, navigation_node::TYPE_SECTION))) {
+                // Remove or hide navigation nodes for sections that are hidden/not available.
+                if (!has_capability('moodle/course:viewhiddenactivities', $context) &&
+                        $navigation->includesectionnum != $sectionnum) {
+                    $sectionnode->remove();
+                } else {
+                    $sectionnode->hidden = true;
+                }
+            }
+        }
     }
 
     /**
@@ -204,6 +238,10 @@ class format_periods extends format_base {
         if ($courseformatoptions === false) {
             $courseconfig = get_config('moodlecourse');
             $courseformatoptions = array(
+                'periodduration' => array(
+                    'default' => 604800,
+                    'type' => PARAM_INT
+                ),
                 'numsections' => array(
                     'default' => $courseconfig->numsections,
                     'type' => PARAM_INT,
@@ -215,10 +253,6 @@ class format_periods extends format_base {
                 'coursedisplay' => array(
                     'default' => $courseconfig->coursedisplay,
                     'type' => PARAM_INT,
-                ),
-                'periodduration' => array(
-                    'default' => 604800,
-                    'type' => PARAM_INT
                 ),
                 'showfutureperiods' => array(
                     'default' => 0,
@@ -249,6 +283,18 @@ class format_periods extends format_base {
                 $sectionmenu[$i] = "$i";
             }
             $courseformatoptionsedit = array(
+                'periodduration' => array(
+                    'label' => new lang_string('periodduration', 'format_periods'),
+                    'help' => 'periodduration',
+                    'help_component' => 'format_periods',
+                    'element_type' => 'select', // TODO extend 'duration' and add elements there.
+                    'element_attributes' => array(
+                        array(
+                            604800 => 'One week', // TODO string
+                            86400 => 'One day', // TODO string
+                        )
+                    ),
+                ),
                 'numsections' => array(
                     'label' => new lang_string('numberperiods', 'format_periods'),
                     'element_type' => 'select',
@@ -267,65 +313,65 @@ class format_periods extends format_base {
                     ),
                 ),
                 'coursedisplay' => array(
-                    'label' => new lang_string('coursedisplay'),
+                    'label' => new lang_string('showperiods', 'format_periods'),
                     'element_type' => 'select',
                     'element_attributes' => array(
                         array(
-                            COURSE_DISPLAY_SINGLEPAGE => new lang_string('coursedisplay_single'),
-                            COURSE_DISPLAY_MULTIPAGE => new lang_string('coursedisplay_multi')
+                            FORMAT_PERIODS_EXPANDED => get_string('showexpanded', 'format_periods'),
+                            FORMAT_PERIODS_COLLAPSED => get_string('showcollapsed', 'format_periods'),
                         )
                     ),
-                    'help' => 'coursedisplay',
-                    'help_component' => 'moodle',
-                ),
-                'periodduration' => array(
-                    'label' => 'Period duration',// TODO: new lang_string('periodduration'),
-                    'element_type' => 'select', // TODO extend 'duration' and add elements there.
-                    'element_attributes' => array(
-                        array(
-                            604800 => 'One week', // TODO string
-                            86400 => 'One day', // TODO string
-                        )
-                    ),
+                    'help' => 'showperiods',
+                    'help_component' => 'format_periods',
                 ),
                 'showfutureperiods' => array(
-                    'label' => 'Future periods',// TODO: new lang_string('periodduration'),
+                    'label' => new lang_string('showfutureperiods', 'format_periods'),
+                    'help' => 'showfutureperiods',
+                    'help_component' => 'format_periods',
                     'element_type' => 'select',
                     'element_attributes' => array(
                         array(
-                            FORMAT_PERIODS_FUTURE_AVAILABLE_ALWAYS => 'Display expanded', // TODO string
-                            //FORMAT_PERIODS_FUTURE_COLLAPSED => 'Display collapsed', // TODO string
-                            FORMAT_PERIODS_FUTURE_NOT_AVAILABLE => 'Hide completely', // TODO string
-                            FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO => 'Hide content', // TODO string
+                            FORMAT_PERIODS_AS_ABOVE => get_string('sameascurrent', 'format_periods'),
+                            FORMAT_PERIODS_COLLAPSED => get_string('showcollapsed', 'format_periods'),
+                            FORMAT_PERIODS_NOTAVAILABLE => get_string('shownotavailable', 'format_periods'),
+                            FORMAT_PERIODS_HIDDEN => get_string('hidecompletely', 'format_periods'),
                         )
                     ),
                 ),
                 'futuresneakpeek' => array(
-                    'label' => 'Future sneak peek',// TODO: new lang_string('periodduration'),
+                    'label' => new lang_string('futuresneakpeek', 'format_periods'),
+                    'help' => 'futuresneakpeek',
+                    'help_component' => 'format_periods',
                     'element_type' => 'duration',
                     'element_attributes' => array(
                         array('defaultunit' => 86400, 'optional' => false)
                     )
                 ),
                 'showpastperiods' => array(
-                    'label' => 'Past periods',// TODO: new lang_string('periodduration'),
+                    'label' => new lang_string('showpastperiods', 'format_periods'),
+                    'help' => 'showpastperiods',
+                    'help_component' => 'format_periods',
                     'element_type' => 'select',
                     'element_attributes' => array(
                         array(
-                            FORMAT_PERIODS_PAST_DISPLAYED_ALWAYS => 'Display expanded', // TODO string
-                            //FORMAT_PERIODS_PAST_COLLAPSED => 'Display collapsed', // TODO string
-                            FORMAT_PERIODS_PAST_NOT_DISPLAYED => 'Hide from the course view', // TODO string
+                            FORMAT_PERIODS_AS_ABOVE => get_string('sameascurrent', 'format_periods'),
+                            FORMAT_PERIODS_COLLAPSED => get_string('showcollapsed', 'format_periods'),
+                            FORMAT_PERIODS_NOTDISPLAYED => get_string('hidefromcourseview', 'format_periods'),
+                            FORMAT_PERIODS_HIDDEN => get_string('hidecompletely', 'format_periods'),
                         )
                     ),
                 ),
                 'showpastcompleted' => array(
-                    'label' => 'Past completed periods',// TODO: new lang_string('periodduration'),
+                    'label' => new lang_string('showpastcompleted', 'format_periods'),
+                    'help' => 'showpastcompleted',
+                    'help_component' => 'format_periods',
                     'element_type' => 'select',
                     'element_attributes' => array(
                         array(
-                            FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE => 'As above', // TODO string
-                            //FORMAT_PERIODS_PAST_COLLAPSED => 'Display collapsed', // TODO string
-                            FORMAT_PERIODS_PAST_NOT_DISPLAYED => 'Hide from the course view', // TODO string
+                            FORMAT_PERIODS_AS_ABOVE => get_string('sameaspast', 'format_periods'),
+                            FORMAT_PERIODS_COLLAPSED => get_string('showcollapsed', 'format_periods'),
+                            FORMAT_PERIODS_NOTDISPLAYED => get_string('hidefromcourseview', 'format_periods'),
+                            FORMAT_PERIODS_HIDDEN => get_string('hidecompletely', 'format_periods'),
                         )
                     ),
                 )
@@ -425,6 +471,7 @@ class format_periods extends format_base {
         $startdate = $course->startdate + 7200;
 
         $dates = new stdClass();
+        // TODO: strtotime('1 day', $startdate);
         $dates->start = $startdate + ($oneperiodseconds * ($sectionnum - 1));
         $dates->end = $dates->start + $oneperiodseconds;
 
@@ -451,6 +498,38 @@ class format_periods extends format_base {
         return (($timenow >= $dates->start) && ($timenow < $dates->end));
     }
 
+    public function get_section_display_mode($section) {
+        $course = $this->get_course();
+        $displaytype = $course->coursedisplay;
+
+        if ($course->showfutureperiods == FORMAT_PERIODS_AS_ABOVE &&
+                $course->showpastperiods == FORMAT_PERIODS_AS_ABOVE &&
+                $course->showpastcompleted == FORMAT_PERIODS_AS_ABOVE) {
+            // Shortcut, nothing else to do.
+            return $displaytype;
+        }
+
+        $dates = $this->get_section_dates($section);
+        $timenow = time();
+        if ($dates->start > $timenow + $course->futuresneakpeek) {
+            // This is a future section.
+            if ($course->showfutureperiods != FORMAT_PERIODS_AS_ABOVE) {
+                $displaytype = $course->showfutureperiods;
+            }
+        } else if ($dates->end < $timenow) {
+            // This is a past section.
+            if ($course->showpastperiods != FORMAT_PERIODS_AS_ABOVE) {
+                $displaytype = $course->showpastperiods;
+            }
+            if ($course->showpastcompleted != FORMAT_PERIODS_AS_ABOVE) {
+                if ($this->is_section_completed($section)) {
+                    $displaytype = $course->showpastcompleted;
+                }
+            }
+        }
+        return $displaytype;
+    }
+
     /**
      * Allows to specify for modinfo that section is not available even when it is visible and conditionally available.
      *
@@ -475,30 +554,13 @@ class format_periods extends format_base {
         if (!$available || !$section->section) {
             return;
         }
-        $dates = $this->get_section_dates($section);
-        $timenow = time();
-        $course = $this->get_course();
-        if ($dates->start > $timenow + $course->futuresneakpeek) {
-            // Future section.
-            if ($course->showfutureperiods == FORMAT_PERIODS_FUTURE_NOT_AVAILABLE) {
-                $available = false;
-                $availableinfo = '';
-            } else if ($course->showfutureperiods == FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO) {
-                $available = false;
-                $availableinfo = 'Not available yet'; // TODO string
-            }
-        }
-        if ($dates->end < $timenow) {
-            $displaytype = $course->showpastperiods;
-            if ($course->showpastcompleted != FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE) {
-                if ($this->is_section_completed($section)) {
-                    $displaytype = $course->showpastcompleted;
-                }
-            }
-            if ($displaytype == FORMAT_PERIODS_PAST_NOT_DISPLAYED) {
-                $available = false;
-                $availableinfo = '';
-            }
+        $displaytype = $this->get_section_display_mode($section);
+        if ($displaytype == FORMAT_PERIODS_HIDDEN) {
+            $available = false;
+            $availableinfo = '';
+        } else if ($displaytype == FORMAT_PERIODS_NOTAVAILABLE) {
+            $available = false;
+            $availableinfo = get_string('notavailable', 'format_periods');
         }
     }
 

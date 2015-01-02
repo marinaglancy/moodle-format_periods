@@ -10,6 +10,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2014051200;        // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2014050800;        // Requires this Moodle version.
+$plugin->version   = 2015010200;        // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires  = 2014111000;        // Requires this Moodle version.
 $plugin->component = 'format_periods';    // Full name of the plugin (used for diagnostics).
