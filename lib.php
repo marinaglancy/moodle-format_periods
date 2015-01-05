@@ -67,19 +67,33 @@ class format_periods extends format_base {
             // Return the general section.
             return get_string('section0name', 'format_periods');
         } else {
-            $dates = $this->get_section_dates($section);
+            return $this->get_section_name_default($section);
+        }
+    }
 
-            // We subtract 24 hours for display purposes.
-            $dates->end = strtotime('-1 day', $dates->end);
+    /**
+     *
+     * @param int|stdClass|section_info $section
+     * @return string
+     */
+    public function get_section_name_default($section) {
+        $dates = $this->get_section_dates($section);
 
-            $dateformat = get_string('strftimedateshort');
-            $weekday = userdate($dates->start, $dateformat);
-            $endweekday = userdate($dates->end, $dateformat);
-            if ($weekday === $endweekday) {
-                return $weekday;
-            } else {
-                return $weekday.' - '.$endweekday;
-            }
+        $course = $this->get_course();
+        if (empty($course->datesformat)) {
+            $dateformat = get_string('strftimedateshort', 'langconfig');
+        } else if ($course->datesformat === 'custom') {
+            $dateformat = $course->datesformatcustom;
+        } else {
+            $dateformat = get_string($course->datesformat, 'langconfig');
+        }
+
+        $weekday = userdate($dates->start, $dateformat);
+        $endweekday = userdate($dates->end - 1, $dateformat);
+        if ($weekday === $endweekday) {
+            return $weekday;
+        } else {
+            return $weekday.' - '.$endweekday;
         }
     }
 
@@ -270,6 +284,14 @@ class format_periods extends format_base {
                 'showpastcompleted' => array(
                     'default' => 0,
                     'type' => PARAM_INT
+                ),
+                'datesformat' => array(
+                    'default' => 'strftimedateshort',
+                    'type' => PARAM_ALPHANUMEXT
+                ),
+                'datesformatcustom' => array(
+                    'default' => '',
+                    'type' => PARAM_NOTAGS
                 )
             );
         }
@@ -286,6 +308,17 @@ class format_periods extends format_base {
             for ($i = 0; $i <= $max; $i++) {
                 $sectionmenu[$i] = "$i";
             }
+            $datesformatlabels = array('strftimedateshort', 'strftimedatefullshort',
+                'strftimedate', 'strftimedatetime', 'strftimedatetimeshort',
+                'strftimedaydate', 'strftimedaydatetime', 'strftimedayshort',
+                'strftimedaytime', 'strftimemonthyear', 'strftimerecent',
+                'strftimerecentfull', 'strftimetime');
+            $datesformatoptions = array();
+            foreach ($datesformatlabels as $label) {
+                $datesformatoptions[$label] = $label.' ('.get_string($label, 'langconfig').') - '.
+                        userdate(time(), get_string($label, 'langconfig'));
+            }
+            $datesformatoptions['custom'] = get_string('customdatesformat', 'format_periods');
             $courseformatoptionsedit = array(
                 'periodduration' => array(
                     'label' => new lang_string('perioddurationdefault', 'format_periods'),
@@ -373,7 +406,20 @@ class format_periods extends format_base {
                             FORMAT_PERIODS_HIDDEN => get_string('hidecompletely', 'format_periods'),
                         )
                     ),
-                )
+                ),
+                'datesformat' => array(
+                    'label' => new lang_string('datesformat', 'format_periods'),
+                    'help' => 'datesformat',
+                    'help_component' => 'format_periods',
+                    'element_type' => 'select',
+                    'element_attributes' => array($datesformatoptions),
+                ),
+                'datesformatcustom' => array(
+                    'label' => new lang_string('datesformatcustom', 'format_periods'),
+                    'help' => 'datesformatcustom',
+                    'help_component' => 'format_periods',
+                    'element_type' => 'text',
+                ),
             );
             $courseformatoptions = array_merge_recursive($courseformatoptions, $courseformatoptionsedit);
         }

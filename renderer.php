@@ -172,4 +172,48 @@ class format_periods_renderer extends format_section_renderer_base {
         }
 
     }
+
+    protected function section_dates($section) {
+        $courseformat = course_get_format($section->course);
+        $section = $courseformat->get_section($section);
+        $context = context_course::instance($section->course);
+        if (has_capability('moodle/course:update', $context)) {
+            $defaultduration = $courseformat->get_course()->periodduration;
+            $o = array(
+                'dates' => $courseformat->get_section_name_default($section),
+                'duration' => $section->periodduration ? $section->periodduration : $defaultduration
+            );
+            if (!empty($section->name)) {
+                if (!empty($section->periodduration) && $section->periodduration != $defaultduration) {
+                    $string = 'sectiondatesduration';
+                } else {
+                    $string = 'sectiondates';
+                }
+            } else if ($section->periodduration && $section->periodduration != $defaultduration) {
+                $string = 'sectionduration';
+            } else {
+                return '';
+            }
+            $text = get_string($string, 'format_periods', (object)$o);
+            return html_writer::tag('div', $text, array('class' => 'sectiondates'));
+        }
+        return '';
+    }
+
+    /**
+     * Generate html for a section summary text
+     *
+     * @param stdClass $section The course_section entry from DB
+     * @return string HTML to output.
+     */
+    protected function format_summary_text($section) {
+        $context = context_course::instance($section->course);
+        $summarytext = $this->section_dates($section). file_rewrite_pluginfile_urls($section->summary, 'pluginfile.php',
+            $context->id, 'course', 'section', $section->id);
+
+        $options = new stdClass();
+        $options->noclean = true;
+        $options->overflowdiv = true;
+        return format_text($summarytext, $section->summaryformat, $options);
+    }
 }

@@ -9,6 +9,11 @@
  */
 
 $string['currentsection'] = 'This period';
+$string['customdatesformat'] = 'Custom';
+$string['datesformat'] = 'Dates format';
+$string['datesformat_help'] = 'Select the format of the dates that is displayed in the default period name';
+$string['datesformatcustom'] = 'Custom dates format';
+$string['datesformatcustom_help'] = 'Specify custom date format for the dates. See <a href="http://php.net/manual/en/function.strftime.php" target="_blank">php manual</a> for syntax';
 $string['futuresneakpeek'] = 'Future sneak peek';
 $string['futuresneakpeek_help'] = 'Treat periods that start earlier than this interval as current (for example this could allow students to see the next week two days before the end of the current week)';
 $string['hidecompletely'] = 'Hide completely';
@@ -26,6 +31,9 @@ $string['pluginname'] = 'Periods format';
 $string['sameaspast'] = 'Same as past periods';
 $string['sameascurrent'] = 'Same as current periods';
 $string['section0name'] = 'General';
+$string['sectiondates'] = 'Period dates: <b>{$a->dates}</b>';
+$string['sectiondatesduration'] = 'Period dates: <b>{$a->dates}</b>; period duration: <b>{$a->duration}</b>';
+$string['sectionduration'] = 'Period duration: <b>{$a->duration}</b>';
 $string['sectionname'] = 'Period';
 $string['showcollapsed'] = 'Show each period as a link to its own page';
 $string['showexpanded'] = 'Show all periods on one page';
