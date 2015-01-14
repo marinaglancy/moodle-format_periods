@@ -1,6 +1,14 @@
 moodle-format_periods
 =====================
 
+Version 2.8.2
+-------------
+
+- On the course page display for teachers the period dates if the section name
+was overridden and also duration if it is not standard.
+- Allow to choose format for the dates
+- Fixed as many codechecker/moodlecheck complains as possible
+
 Version 2.8.1 (Initial version)
 -------------------------------
 

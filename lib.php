@@ -1,4 +1,18 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * This file contains main class for the course format Periods
@@ -10,19 +24,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot. '/course/format/lib.php');
-
-/*
-define('FORMAT_PERIODS_FUTURE_AVAILABLE_ALWAYS', 0);
-define('FORMAT_PERIODS_FUTURE_COLLAPSED', 1);
-define('FORMAT_PERIODS_FUTURE_NOT_AVAILABLE', 5);
-define('FORMAT_PERIODS_FUTURE_NOT_AVAILABLE_WITH_INFO', 6);
-
-define('FORMAT_PERIODS_PAST_DISPLAYED_ALWAYS', 0);
-define('FORMAT_PERIODS_PAST_COLLAPSED', 1);
-define('FORMAT_PERIODS_PAST_NOT_DISPLAYED', 2);
-
-define('FORMAT_PERIODS_PAST_COMPLETED_AS_ABOVE', 0);
-*/
 
 define('FORMAT_PERIODS_AS_ABOVE', 0);
 
@@ -72,6 +73,7 @@ class format_periods extends format_base {
     }
 
     /**
+     * Returns the default name for the section (dates interval).
      *
      * @param int|stdClass|section_info $section
      * @return string
@@ -165,7 +167,7 @@ class format_periods extends format_base {
      */
     public function extend_course_navigation($navigation, navigation_node $node) {
         global $PAGE;
-        // if section is specified in course/view.php, make sure it is expanded in navigation
+        // If section is specified in course/view.php, make sure it is expanded in navigation.
         if ($navigation->includesectionnum === false) {
             $selectedsection = optional_param('section', null, PARAM_INT);
             if ($selectedsection !== null && (!defined('AJAX_SCRIPT') || AJAX_SCRIPT == '0') &&
@@ -205,7 +207,7 @@ class format_periods extends format_base {
      *
      * @return array This will be passed in ajax respose
      */
-    function ajax_section_move() {
+    public function ajax_section_move() {
         global $PAGE;
         $titles = array();
         $current = -1;
@@ -505,7 +507,7 @@ class format_periods extends format_base {
             $numsections = $numsections[0];
             if ($numsections > $maxsections) {
                 $element = $mform->getElement('numsections');
-                for ($i = $maxsections+1; $i <= $numsections; $i++) {
+                for ($i = $maxsections + 1; $i <= $numsections; $i++) {
                     $element->addOption("$i", $i);
                 }
             }
@@ -539,11 +541,11 @@ class format_periods extends format_base {
                     } else if ($key === 'numsections') {
                         // If previous format does not have the field 'numsections'
                         // and $data['numsections'] is not set,
-                        // we fill it with the maximum section number from the DB
+                        // we fill it with the maximum section number from the DB.
                         $maxsection = $DB->get_field_sql('SELECT max(section) from {course_sections}
                             WHERE course = ?', array($this->courseid));
                         if ($maxsection) {
-                            // If there are no sections, or just default 0-section, 'numsections' will be set to default
+                            // If there are no sections, or just default 0-section, 'numsections' will be set to default.
                             $data['numsections'] = $maxsection;
                         }
                     }
@@ -573,7 +575,7 @@ class format_periods extends format_base {
         $sections = $this->get_sections();
         foreach ($sections as $snum => $sectioninfo) {
             if (!$snum) {
-
+                continue;
             } else if ($snum <= $sectionnum) {
                 $duration = $sectioninfo->periodduration ? $sectioninfo->periodduration : $course->periodduration;
                 if (is_int($duration)) {
@@ -613,6 +615,12 @@ class format_periods extends format_base {
         return (($timenow >= $dates->start) && ($timenow < $dates->end));
     }
 
+    /**
+     * Returns the display mode actually used by a particular section
+     *
+     * @param int|stdClass|section_info $section
+     * @return int
+     */
     public function get_section_display_mode($section) {
         $course = $this->get_course();
         $displaytype = $course->coursedisplay;
@@ -679,6 +687,7 @@ class format_periods extends format_base {
         }
     }
 
+    /** @var completion_info cached value of course completion info */
     protected $completioninfo = null;
 
     /**
