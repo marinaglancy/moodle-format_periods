@@ -696,12 +696,17 @@ class format_periods extends format_base {
      * If the section was not completed at the start of the session but became
      * completed, this function will still return false.
      *
-     * @param section_info $section
+     * @param int|stdClass|section_info $section
      * @return bool
      */
-    public function is_section_completed(section_info $section) {
+    public function is_section_completed($section) {
+        if (is_object($section)) {
+            $sectionnum = $section->section;
+        } else {
+            $sectionnum = $section;
+        }
         global $SESSION;
-        if (!empty($SESSION->format_periods[$this->courseid][$section->section])) {
+        if (!empty($SESSION->format_periods[$this->courseid][$sectionnum])) {
             // This section was not completed at the beginning of the session,
             // consider it to be still not completed.
             return false;
@@ -709,9 +714,9 @@ class format_periods extends format_base {
         if ($this->completioninfo === null) {
             $this->completioninfo = new completion_info($this->get_course());
         }
-        $modinfo = $section->modinfo;
-        if (!empty($modinfo->sections[$section->section])) {
-            foreach ($modinfo->sections[$section->section] as $cmid) {
+        $modinfo = get_fast_modinfo($this->get_course());
+        if (!empty($modinfo->sections[$sectionnum])) {
+            foreach ($modinfo->sections[$sectionnum] as $cmid) {
                 $cm = $modinfo->cms[$cmid];
 
                 $completion = $this->completioninfo->is_enabled($cm);
@@ -731,7 +736,7 @@ class format_periods extends format_base {
                 if (empty($SESSION->format_periods[$this->courseid])) {
                     $SESSION->format_periods[$this->courseid] = array();
                 }
-                $SESSION->format_periods[$this->courseid][$section->section] = 1;
+                $SESSION->format_periods[$this->courseid][$sectionnum] = 1;
                 return false;
             }
         }
