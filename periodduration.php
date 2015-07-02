@@ -99,7 +99,7 @@ class format_periods_periodduration extends MoodleQuickForm_group {
             $this->_units = array(
                 'day' => get_string('days'),
                 'week' => get_string('weeks'),
-                'month' => core_text::strtolower(get_string('months')),
+                'month' => get_string('months'),
                 'year' => get_string('years'),
             );
         }
