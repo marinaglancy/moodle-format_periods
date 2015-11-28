@@ -200,7 +200,7 @@ class format_periods_renderer extends format_section_renderer_base {
         if (has_capability('moodle/course:update', $context)) {
             $defaultduration = $courseformat->get_course()->periodduration;
             $o = array(
-                'dates' => $courseformat->get_section_name_default($section),
+                'dates' => $courseformat->get_default_section_name($section),
                 'duration' => $section->periodduration ? $section->periodduration : $defaultduration
             );
             if (!empty($section->name)) {

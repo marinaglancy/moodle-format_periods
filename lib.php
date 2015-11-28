@@ -64,11 +64,8 @@ class format_periods extends format_base {
         if ((string)$section->name !== '') {
             // Return the name the user set.
             return format_string($section->name, true, array('context' => context_course::instance($this->courseid)));
-        } else if ($section->section == 0) {
-            // Return the general section.
-            return get_string('section0name', 'format_periods');
         } else {
-            return $this->get_section_name_default($section);
+            return $this->get_default_section_name($section);
         }
     }
 
@@ -78,7 +75,13 @@ class format_periods extends format_base {
      * @param int|stdClass|section_info $section
      * @return string
      */
-    public function get_section_name_default($section) {
+    public function get_default_section_name($section) {
+        $section = $this->get_section($section);
+        if ($section->section == 0) {
+            // Return the general section.
+            return get_string('section0name', 'format_periods');
+        }
+
         $dates = $this->get_section_dates($section);
 
         $course = $this->get_course();
