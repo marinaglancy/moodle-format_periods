@@ -1,6 +1,11 @@
 moodle-format_periods
 =====================
 
+Version 2.8.3
+-------------
+
+- Fixed localisation of period duration, see issues #1 and #2 in github
+
 Version 2.8.2
 -------------
 

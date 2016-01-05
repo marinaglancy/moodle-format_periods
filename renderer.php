@@ -234,7 +234,7 @@ class format_periods_renderer extends format_section_renderer_base {
         }
         $num = (int)$matches[1];
         $units = $matches[2];
-        if ($num > 1) {
+        if ($num > 1 || !get_string_manager()->string_exists('num'.$units, 'core')) {
             $units .= 's';
         }
         return get_string('num'.$units, 'core', $num);
