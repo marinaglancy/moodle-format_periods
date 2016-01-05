@@ -203,6 +203,7 @@ class format_periods_renderer extends format_section_renderer_base {
                 'dates' => $courseformat->get_section_name_default($section),
                 'duration' => $section->periodduration ? $section->periodduration : $defaultduration
             );
+            $o['duration'] = $this->duration_to_string($o['duration']);
             if (!empty($section->name)) {
                 if (!empty($section->periodduration) && $section->periodduration != $defaultduration) {
                     $string = 'sectiondatesduration';
@@ -218,6 +219,25 @@ class format_periods_renderer extends format_section_renderer_base {
             return html_writer::tag('div', $text, array('class' => 'sectiondates'));
         }
         return '';
+    }
+
+    /**
+     * Converts a duration (in the format 'NN UNIT') into a localised language string
+     * (e.g. '4 week' => '4 Wochen')
+     *
+     * @param string $duration
+     * @return string
+     */
+    protected function duration_to_string($duration) {
+        if (!preg_match('/^(\d+) (\w+)$/', $duration, $matches)) {
+             return $duration;
+        }
+        $num = (int)$matches[1];
+        $units = $matches[2];
+        if ($num > 1) {
+            $units .= 's';
+        }
+        return get_string('num'.$units, 'core', $num);
     }
 
     /**
