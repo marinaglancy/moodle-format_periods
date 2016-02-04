@@ -1,6 +1,11 @@
 moodle-format_periods
 =====================
 
+Version 3.0.2
+-------------
+
+- Allow to delete periods
+
 Version 3.0.1
 -------------
 
