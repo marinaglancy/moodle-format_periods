@@ -28,6 +28,7 @@ $string['datesformat'] = 'Dates format';
 $string['datesformat_help'] = 'Select the format of the dates that is displayed in the default period name';
 $string['datesformatcustom'] = 'Custom dates format';
 $string['datesformatcustom_help'] = 'Specify custom date format for the dates. See <a href="http://php.net/manual/en/function.strftime.php" target="_blank">php manual</a> for syntax';
+$string['deletesection'] = 'Delete period';
 $string['editsection'] = 'Edit period';
 $string['futuresneakpeek'] = 'Future sneak peek';
 $string['futuresneakpeek_help'] = 'Treat periods that start earlier than this interval as current (for example this could allow students to see the next week two days before the end of the current week)';
