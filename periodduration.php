@@ -66,8 +66,9 @@ class format_periods_periodduration extends MoodleQuickForm_group {
      *              If not specified, minutes is used.
      * @param mixed $attributes Either a typical HTML attribute string or an associative array
      */
-    public function format_periods_periodduration($elementname = null, $elementlabel = null, $options = array(), $attributes = null) {
-        $this->HTML_QuickForm_element($elementname, $elementlabel, $attributes);
+    public function __construct($elementname = null, $elementlabel = null, $options = array(), $attributes = null) {
+        parent::__construct($elementname, $elementlabel);
+        $this->setAttributes($attributes);
         $this->_persistantFreeze = true;
         $this->_appendName = true;
         $this->_type = 'duration';

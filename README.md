@@ -1,6 +1,12 @@
 moodle-format_periods
 =====================
 
+Version 3.0.3
+-------------
+
+- Compatibility with section name editing in Moodle 3.1 (still works on previous
+  versions)
+
 Version 3.0.2
 -------------
 
