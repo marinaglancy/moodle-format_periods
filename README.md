@@ -1,6 +1,11 @@
 moodle-format_periods
 =====================
 
+Version 3.0.4
+-------------
+
+- Compatibility with Moodle 3.2, Boost and PHP7.1 (still works on previous versions)
+
 Version 3.0.3
 -------------
 
