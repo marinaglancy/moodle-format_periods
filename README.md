@@ -1,6 +1,14 @@
 moodle-format_periods
 =====================
 
+Version 3.3.0
+-------------
+
+- Compatibility with Moodle 3.3
+- Stealth activities
+- Removed 'Number of sections', sections can be added when needed
+- Automatic end date calculation
+
 Version 3.0.4
 -------------
 

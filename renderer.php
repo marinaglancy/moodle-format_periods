@@ -97,10 +97,6 @@ class format_periods_renderer extends format_section_renderer_base {
                 }
                 continue;
             }
-            if ($section > $course->numsections) {
-                // Activities inside this section are 'orphaned', this section will be printed as 'stealth' below.
-                continue;
-            }
 
             // Do not display sections in the past/future that must be hidden by course settings.
             $displaymode = course_get_format($course)->get_section_display_mode($thissection);
@@ -144,45 +140,10 @@ class format_periods_renderer extends format_section_renderer_base {
             }
         }
 
+        echo $this->end_section_list();
+
         if ($PAGE->user_is_editing() and has_capability('moodle/course:update', $context)) {
-            // Print stealth sections if present.
-            foreach ($modinfo->get_section_info_all() as $section => $thissection) {
-                if ($section <= $course->numsections or empty($modinfo->sections[$section])) {
-                    // This is not stealth section or it is empty.
-                    continue;
-                }
-                echo $this->stealth_section_header($section);
-                echo $this->courserenderer->course_section_cm_list($course, $thissection, 0);
-                echo $this->stealth_section_footer();
-            }
-
-            echo $this->end_section_list();
-
-            echo html_writer::start_tag('div', array('id' => 'changenumsections', 'class' => 'mdl-right'));
-
-            // Increase number of sections.
-            $straddsection = get_string('increasesections', 'moodle');
-            $url = new moodle_url('/course/changenumsections.php',
-                array('courseid' => $course->id,
-                      'increase' => true,
-                      'sesskey' => sesskey()));
-            $icon = $this->output->pix_icon('t/switch_plus', $straddsection);
-            echo html_writer::link($url, $icon.get_accesshide($straddsection), array('class' => 'increase-sections'));
-
-            if ($course->numsections > 0) {
-                // Reduce number of sections sections.
-                $strremovesection = get_string('reducesections', 'moodle');
-                $url = new moodle_url('/course/changenumsections.php',
-                    array('courseid' => $course->id,
-                          'increase' => false,
-                          'sesskey' => sesskey()));
-                $icon = $this->output->pix_icon('t/switch_minus', $strremovesection);
-                echo html_writer::link($url, $icon.get_accesshide($strremovesection), array('class' => 'reduce-sections'));
-            }
-
-            echo html_writer::end_tag('div');
-        } else {
-            echo $this->end_section_list();
+            echo $this->change_number_sections($course, 0);
         }
 
     }

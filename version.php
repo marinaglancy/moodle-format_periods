@@ -24,9 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2017012000;        // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2015111600;        // Requires this Moodle version.
+$plugin->version   = 2017050501;        // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires  = 2017050300;        // Requires this Moodle version.
 $plugin->component = 'format_periods';    // Full name of the plugin (used for diagnostics).
-$plugin->release   = "3.0.4";
+$plugin->release   = "3.3.0";
 $plugin->maturity  = MATURITY_STABLE;
 

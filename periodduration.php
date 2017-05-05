@@ -54,11 +54,6 @@ class format_periods_periodduration extends MoodleQuickForm_group {
     /** @var array associative array of time units (days, hours, minutes, seconds) */
     private $_units = null;
 
-    /** @var MoodleQuickForm
-     *  @todo remove this variable when minimum required Moodle version is 3.2
-     */
-    protected $__mform = null;
-
     /**
      * constructor
      *
@@ -269,29 +264,5 @@ class format_periods_periodduration extends MoodleQuickForm_group {
             return array($this->getName() => 0);
         }
         return array($this->getName() => $valuearray['number'] . ' ' . $valuearray['timeunit']);
-    }
-
-    /**
-     * Creates an element to add to the group
-     * Expects the same arguments as MoodleQuickForm::createElement()
-     * @todo remove this method when minimum required Moodle version is 3.2
-     */
-    public function createFormElement() {
-        if (!$this->__mform) {
-            throw new coding_exception('You can not call createFormElement() on the group element that was not yet added to a form.');
-        }
-        return call_user_func_array([$this->__mform, 'createElement'], func_get_args());
-    }
-
-    /**
-     * Stores the form this element was added to
-     * This object is later used by {@link MoodleQuickForm_group::createElement()}
-     * @param null|MoodleQuickForm $mform
-     * @todo remove this method when minimum required Moodle version is 3.2
-     */
-    public function setMoodleForm($mform) {
-        if ($mform && $mform instanceof MoodleQuickForm) {
-            $this->__mform = $mform;
-        }
     }
 }

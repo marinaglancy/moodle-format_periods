@@ -15,27 +15,30 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Periods course format.  Display the whole course as "periods" made of modules.
+ * Format periods event handler definition.
  *
  * @package format_periods
- * @copyright 2014 Marina Glancy
+ * @copyright 2017 Marina Glancy
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir.'/filelib.php');
-require_once($CFG->libdir.'/completionlib.php');
-
-// Make sure all sections are created.
-$course = course_get_format($course)->get_course();
-
-$renderer = $PAGE->get_renderer('format_periods');
-
-if (!empty($displaysection)) {
-    $renderer->print_single_section_page($course, null, null, null, null, $displaysection);
-} else {
-    $renderer->print_multiple_section_page($course, null, null, null, null);
-}
-
-$PAGE->requires->js('/course/format/periods/format.js');
+$observers = array(
+    array(
+        'eventname'   => '\core\event\course_updated',
+        'callback'    => 'format_periods_observer::course_updated',
+    ),
+    array(
+        'eventname'   => '\core\event\course_section_created',
+        'callback'    => 'format_periods_observer::course_section_created',
+    ),
+    array(
+        'eventname'   => '\core\event\course_section_updated',
+        'callback'    => 'format_periods_observer::course_section_updated',
+    ),
+    array(
+        'eventname'   => '\core\event\course_section_deleted',
+        'callback'    => 'format_periods_observer::course_section_deleted',
+    )
+);

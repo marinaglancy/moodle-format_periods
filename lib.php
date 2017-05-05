@@ -237,7 +237,7 @@ class format_periods extends format_base {
     public function get_default_blocks() {
         return array(
             BLOCK_POS_LEFT => array(),
-            BLOCK_POS_RIGHT => array('search_forums', 'news_items', 'calendar_upcoming', 'recent_activity')
+            BLOCK_POS_RIGHT => array()
         );
     }
 
@@ -258,13 +258,13 @@ class format_periods extends format_base {
         if ($courseformatoptions === false) {
             $courseconfig = get_config('moodlecourse');
             $courseformatoptions = array(
+                'automaticenddate' => array(
+                    'default' => 1,
+                    'type' => PARAM_BOOL,
+                ),
                 'periodduration' => array(
                     'default' => '1 week', // TODO this does not work.
                     'type' => PARAM_NOTAGS
-                ),
-                'numsections' => array(
-                    'default' => $courseconfig->numsections,
-                    'type' => PARAM_INT,
                 ),
                 'hiddensections' => array(
                     'default' => $courseconfig->hiddensections,
@@ -297,22 +297,13 @@ class format_periods extends format_base {
                 'datesformatcustom' => array(
                     'default' => '',
                     'type' => PARAM_NOTAGS
-                )
+                ),
             );
         }
         if ($foreditform && !isset($courseformatoptions['coursedisplay']['label'])) {
 
             require_once("$CFG->dirroot/course/format/periods/periodduration.php");
 
-            $courseconfig = get_config('moodlecourse');
-            $sectionmenu = array();
-            $max = $courseconfig->maxsections;
-            if (!isset($max) || !is_numeric($max)) {
-                $max = 52;
-            }
-            for ($i = 0; $i <= $max; $i++) {
-                $sectionmenu[$i] = "$i";
-            }
             $datesformatlabels = array('strftimedateshort', 'strftimedatefullshort',
                 'strftimedate', 'strftimedatetime', 'strftimedatetimeshort',
                 'strftimedaydate', 'strftimedaydatetime', 'strftimedayshort',
@@ -325,17 +316,18 @@ class format_periods extends format_base {
             }
             $datesformatoptions['custom'] = get_string('customdatesformat', 'format_periods');
             $courseformatoptionsedit = array(
+                'automaticenddate' => array(
+                    'label' => new lang_string('automaticenddate', 'format_periods'),
+                    'help' => 'automaticenddate',
+                    'help_component' => 'format_periods',
+                    'element_type' => 'advcheckbox',
+                ),
                 'periodduration' => array(
                     'label' => new lang_string('perioddurationdefault', 'format_periods'),
                     'help' => 'perioddurationdefault',
                     'help_component' => 'format_periods',
                     'element_type' => 'periodduration',
                     'element_attributes' => array(array('default' => '1 week')),
-                ),
-                'numsections' => array(
-                    'label' => new lang_string('numberperiods', 'format_periods'),
-                    'element_type' => 'select',
-                    'element_attributes' => array($sectionmenu),
                 ),
                 'hiddensections' => array(
                     'label' => new lang_string('hiddensections'),
@@ -497,24 +489,36 @@ class format_periods extends format_base {
      * @return array array of references to the added form elements.
      */
     public function create_edit_form_elements(&$mform, $forsection = false) {
+        global $COURSE;
         $elements = parent::create_edit_form_elements($mform, $forsection);
 
-        // Increase the number of sections combo box values if the user has increased the number of sections
-        // using the icon on the course page beyond course 'maxsections' or course 'maxsections' has been
-        // reduced below the number of sections already set for the course on the site administration course
-        // defaults page.  This is so that the number of sections is not reduced leaving unintended orphaned
-        // activities / resources.
+        if (!$forsection && (empty($COURSE->id) || $COURSE->id == SITEID)) {
+            // Add "numsections" element to the create course form - it will force new course to be prepopulated
+            // with empty sections.
+            // The "Number of sections" option is no longer available when editing course, instead teachers should
+            // delete and add sections when needed.
+            $courseconfig = get_config('moodlecourse');
+            $max = (int)$courseconfig->maxsections;
+            $element = $mform->addElement('select', 'numsections', get_string('numberperiods', 'format_periods'), range(0, $max ?: 52));
+            $mform->setType('numsections', PARAM_INT);
+            if (is_null($mform->getElementValue('numsections'))) {
+                $mform->setDefault('numsections', $courseconfig->numsections);
+            }
+            array_unshift($elements, $element);
+        }
+
+        // Re-order things.
         if (!$forsection) {
-            $maxsections = get_config('moodlecourse', 'maxsections');
-            $numsections = $mform->getElementValue('numsections');
-            $numsections = $numsections[0];
-            if ($numsections > $maxsections) {
-                $element = $mform->getElement('numsections');
-                for ($i = $maxsections + 1; $i <= $numsections; $i++) {
-                    $element->addOption("$i", $i);
+            $mform->insertElementBefore($mform->removeElement('automaticenddate', false), 'idnumber');
+            $mform->disabledIf('enddate', 'automaticenddate', 'checked');
+            foreach ($elements as $key => $element) {
+                if ($element->getName() == 'automaticenddate') {
+                    unset($elements[$key]);
                 }
             }
+            $elements = array_values($elements);
         }
+
         return $elements;
     }
 
@@ -564,8 +568,14 @@ class format_periods extends format_base {
      * @param int|stdClass|section_info $section section to get the dates for
      * @return stdClass property start for startdate, property end for enddate
      */
-    public function get_section_dates($section) {
-        $course = $this->get_course();
+    public function get_section_dates($section, $startdate = null, $sections = null) {
+        if ($startdate === null) {
+            $startdate = $this->courseid ? $this->get_course()->startdate : 0;
+        }
+        $periodduration = '1 week';
+        if ($this->courseid) {
+            $periodduration = $this->get_course()->periodduration;
+        }
         if (is_object($section)) {
             $sectionnum = $section->section;
         } else {
@@ -573,14 +583,14 @@ class format_periods extends format_base {
         }
 
         $dates = new stdClass();
-        $dates->end = $dates->start = $course->startdate;
+        $dates->end = $dates->start = $startdate;
 
-        $sections = $this->get_sections();
+        $sections = ($sections !== null) ? $sections : $this->get_sections();
         foreach ($sections as $snum => $sectioninfo) {
             if (!$snum) {
                 continue;
             } else if ($snum <= $sectionnum) {
-                $duration = $sectioninfo->periodduration ? $sectioninfo->periodduration : $course->periodduration;
+                $duration = $sectioninfo->periodduration ? $sectioninfo->periodduration : $periodduration;
                 if (is_int($duration)) {
                     $dt = $dates->start + $duration;
                 } else {
@@ -778,6 +788,138 @@ class format_periods extends format_base {
             $editlabel = new lang_string('newsectionname', 'format_periods', $title);
         }
         return parent::inplace_editable_render_section_name($section, $linkifneeded, $editable, $edithint, $editlabel);
+    }
+
+    /**
+     * Returns whether this course format allows the activity to
+     * have "triple visibility state" - visible always, hidden on course page but available, hidden.
+     *
+     * @param stdClass|cm_info $cm course module (may be null if we are displaying a form for adding a module)
+     * @param stdClass|section_info $section section where this module is located or will be added to
+     * @return bool
+     */
+    public function allow_stealth_module_visibility($cm, $section) {
+        // Allow the third visibility state inside visible sections or in section 0.
+        return !$section->section || $section->visible;
+    }
+
+    /**
+     * Returns the default end date for periods course format.
+     *
+     * @param moodleform $mform
+     * @param array $fieldnames The form - field names mapping.
+     * @return int
+     */
+    public function get_default_course_enddate($mform, $fieldnames = array()) {
+
+        if (empty($fieldnames['startdate'])) {
+            $fieldnames['startdate'] = 'startdate';
+        }
+
+        if (empty($fieldnames['numsections'])) {
+            $fieldnames['numsections'] = 'numsections';
+        }
+
+        $startdate = $this->get_form_start_date($mform, $fieldnames);
+        if ($mform->elementExists($fieldnames['numsections'])) {
+            $numsections = $mform->getElementValue($fieldnames['numsections']);
+            $numsections = $mform->getElement($fieldnames['numsections'])->exportValue($numsections);
+        } else if ($this->get_courseid()) {
+            // For existing courses get the number of sections.
+            $numsections = $this->get_last_section_number();
+        } else {
+            // Fallback to the default value for new courses.
+            $numsections = get_config('moodlecourse', $fieldnames['numsections']);
+        }
+
+        // Final week's last day.
+        $dates = $this->get_section_dates(intval($numsections), $startdate);
+        return $dates->end;
+    }
+
+    /**
+     * Updates the end date for a course in weeks format if option automaticenddate is set.
+     *
+     * This method is called from event observers and it can not use any modinfo or format caches because
+     * events are triggered before the caches are reset.
+     *
+     * @param int $courseid
+     */
+    public static function update_end_date($courseid) {
+        global $DB, $COURSE;
+
+        // Use one DB query to retrieve necessary fields in course, value for automaticenddate and number of the last
+        // section. This query will also validate that the course is indeed in 'periods' format.
+        $sql = "SELECT c.id, c.format, c.startdate, c.enddate, fo.value AS automaticenddate, d.value as periodduration
+                  FROM {course} c
+             LEFT JOIN {course_format_options} fo
+                    ON fo.courseid = c.id
+                   AND fo.format = c.format
+                   AND fo.name = 'automaticenddate'
+                   AND fo.sectionid = 0
+             LEFT JOIN {course_format_options} d
+                    ON d.courseid = c.id
+                   AND d.format = c.format
+                   AND d.name = 'periodduration'
+                   AND d.sectionid = 0
+                 WHERE c.format = :format
+                   AND c.id = :courseid";
+        $course = $DB->get_record_sql($sql, ['format' => 'periods', 'courseid' => $courseid]);
+
+        if (!$course) {
+            // Looks like it is a course in a different format, nothing to do here.
+            return;
+        }
+
+        // Create an instance of this class and mock the course object.
+        $format = new format_periods('periods', $courseid);
+        $format->course = $course;
+
+        // If automaticenddate is not specified take the default value.
+        if (!isset($course->automaticenddate)) {
+            $defaults = $format->course_format_options();
+            $course->automaticenddate = $defaults['automaticenddate'];
+        }
+        // Check that the course format for setting an automatic date is set.
+        if (empty($course->automaticenddate)) {
+            return;
+        }
+
+        if (!isset($course->periodduration)) {
+            $defaults = isset($defaults) ? $defaults : $format->course_format_options();
+            $course->periodduration = $defaults['periodduration'];
+        }
+
+        $sections = $DB->get_records_sql("SELECT s.section, s.id, d.value as periodduration
+            FROM {course_sections} s
+             LEFT JOIN {course_format_options} d
+                    ON d.courseid = s.course
+                   AND d.format = 'periods'
+                   AND d.name = 'periodduration'
+                   AND d.sectionid = s.id
+            WHERE s.course = :courseid AND s.section > 0
+            ORDER BY s.section
+            ", ['courseid' => $courseid]);
+
+        // Get the final period's last day.
+        if (!$sections) {
+            $enddate = $course->startdate;
+        } else {
+            $dates = $format->get_section_dates(max(array_keys($sections)), null, $sections);
+            $enddate = $dates->end;
+        }
+
+        // Set the course end date.
+        if ($course->enddate != $enddate) {
+            $DB->set_field('course', 'enddate', $enddate, array('id' => $course->id));
+            if (isset($COURSE->id) && $COURSE->id == $courseid) {
+                $COURSE->enddate = $enddate;
+            }
+        }
+    }
+
+    public function supports_news() {
+        return true;
     }
 }
 

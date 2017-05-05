@@ -22,6 +22,8 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['automaticenddate'] = 'Calculate the end date from the end of the last period';
+$string['automaticenddate_help'] = 'If enabled, the end date for the course will be automatically calculated from the end date of the last period.';
 $string['currentsection'] = 'This period';
 $string['customdatesformat'] = 'Custom';
 $string['datesformat'] = 'Dates format';
