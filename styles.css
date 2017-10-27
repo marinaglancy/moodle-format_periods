@@ -1,13 +1,21 @@
-.course-content ul.periods {margin:0;}
+/* stylelint-disable */
+.course-content ul.periods {
+    margin: 0;
+    padding: 0;
+}
 .course-content ul.periods li.section {list-style: none;margin:0 0 5px 0;padding:0;}
 .course-content ul.periods li.section .content {margin:0 20px;}
 .course-content ul.periods li.section .left,
 .course-content ul.periods li.section .right {width:40px;padding: 0 6px;}
 .course-content ul.periods li.section .right img.icon { padding: 0 0 4px 0;}
 .course-content ul.periods div.sectiondates {font-style:italic; color: #888;}
-.course-content ul.periods li.section .left {padding-top:22px;text-align: right;}
+.course-content ul.periods li.section .left {padding-top:0;text-align: right;}
 .jsenabled .course-content ul.periods li.section .left,
 .jsenabled .course-content ul.periods li.section .right {width:auto;}
 .course-content ul.periods li.section .left .section-handle img.icon { padding:0; vertical-align: baseline; }
 .course-content ul.periods li.section .section_action_menu .textmenu,
 .course-content ul.periods li.section .section_action_menu .menu-action-text { white-space: nowrap; }
+
+.course-content ul.periods li.section .summary {
+    margin-left: 25px;
+}
