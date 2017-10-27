@@ -1,6 +1,13 @@
 moodle-format_periods
 =====================
 
+Version 3.3.1
+-------------
+
+- Version for Moodle 3.3 and 3.4
+- Small CSS fixes
+- Respect $CFG->linkcoursesections
+
 Version 3.3.0
 -------------
 
