@@ -1,6 +1,11 @@
 moodle-format_periods
 =====================
 
+Version 3.0.5
+-------------
+
+- Small CSS and JS fixes, version for Moodle 3.0, 3.1 and 3.2
+
 Version 3.0.4
 -------------
 
